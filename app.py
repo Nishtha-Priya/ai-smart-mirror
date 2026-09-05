@@ -1,12 +1,18 @@
 import cv2
-
+import time
+from ui.mirror_ui import MirrorUI
 from gestures.hand_tracker import HandTracker
 
 
-# Initialize hand tracker
+last_gesture = None
+last_gesture_time = 0
+
+GESTURE_COOLDOWN = 0.8
+
+# Initialize hand tracker and ui
 
 hand_tracker = HandTracker()
-
+mirror_ui = MirrorUI()
 
 # Camera setup
 cap = cv2.VideoCapture(0)
@@ -33,33 +39,28 @@ while True:
 
     # Process detected hands
 
-    if result.hand_landmarks:
+    gesture = None
 
-        total_fingers = 0
+    if result.hand_landmarks:
 
         for i, hand in enumerate(result.hand_landmarks):
 
-            # MediaPipe handedness
-            handedness = (
-                result.handedness[i][0].category_name
-            )
+            handedness = result.handedness[i][0].category_name
 
-            # Correct for mirrored camera
+            # Correct mirrored camera handedness
             if handedness == "Left":
                 handedness = "Right"
             else:
                 handedness = "Left"
 
-            # Count fingers
-            finger_count = hand_tracker.count_fingers(
+            gesture = hand_tracker.recognize_gesture(
                 hand,
                 handedness
             )
 
-            total_fingers += finger_count
+            mirror_ui.handle_gesture(gesture)
 
             # Draw landmarks
-
             h, w, _ = frame.shape
 
             for landmark in hand:
@@ -75,34 +76,11 @@ while True:
                     -1
                 )
 
-            # Display hand information
-
-            wrist = hand[0]
-
-            wrist_x = int(wrist.x * w)
-            wrist_y = int(wrist.y * h)
-
-            cv2.putText(
-                frame,
-                f"{handedness}: {finger_count}",
-                (wrist_x - 80, wrist_y - 30),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                (0, 255, 0),
-                2
-            )
-
-        # Total fingers
-
-        cv2.putText(
-            frame,
-            f"Total: {total_fingers}",
-            (30, 60),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (0, 255, 0),
-            2
-        )
+    # Draw mirror UI
+    mirror_ui.draw(
+        frame,
+        gesture
+    )
 
     # Display
 

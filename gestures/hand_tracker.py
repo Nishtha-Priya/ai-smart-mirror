@@ -113,6 +113,60 @@ class HandTracker:
 
         return count
 
+    def recognize_gesture(self, hand, handedness):
+
+        # Pinch(priority)
+        if self.is_pinching(hand):
+            return "PINCH"
+
+        finger_count = self.count_fingers(
+            hand,
+            handedness
+        )
+
+        # Fist
+        if finger_count == 0:
+            return "FIST"
+
+        # One finger
+        if finger_count == 1:
+            return "ONE"
+
+        # Peace sign
+        if finger_count == 2:
+
+            index_up = self.is_finger_extended(
+                hand, 5, 6, 7, 8
+            )
+
+            middle_up = self.is_finger_extended(
+                hand, 9, 10, 11, 12
+            )
+
+            if index_up and middle_up:
+                return "PEACE"
+
+        # Three fingers
+        if finger_count == 3:
+            return "THREE"
+
+        # Open palm
+        if finger_count == 5:
+            return "OPEN_PALM"
+
+        return "UNKNOWN"
+
+    def is_pinching(self, hand):
+
+        thumb = hand[4]
+        index = hand[8]
+
+        distance = math.sqrt(
+            (thumb.x-index.x)**2+(thumb.y-index.y)**2
+        )
+
+        return distance < 0.05
+
     # Close detector
 
     def close(self):
