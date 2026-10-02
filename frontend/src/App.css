@@ -1,0 +1,225 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, sans-serif;
+  background: #080812;
+  color: white;
+}
+
+.mirror {
+  min-height: 100vh;
+  background:
+    radial-gradient(
+      circle at 20% 20%,
+      rgba(120, 80, 255, 0.18),
+      transparent 35%
+    ),
+    radial-gradient(
+      circle at 80% 80%,
+      rgba(0, 220, 255, 0.12),
+      transparent 35%
+    ),
+    #080812;
+
+  padding: 30px 50px;
+
+  display: flex;
+  flex-direction: column;
+}
+
+
+/*Top bar*/
+
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.time {
+  font-size: 28px;
+  font-weight: 300;
+}
+
+
+/*Main content*/
+
+.mirror-content {
+  width: min(1200px, 100%);
+  margin: auto;
+}
+
+.greeting {
+  margin-bottom: 25px;
+}
+
+.small-text {
+  font-size: 12px;
+  letter-spacing: 3px;
+  opacity: 0.6;
+  margin-bottom: 5px;
+}
+
+.greeting h1 {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 500;
+}
+
+
+/*Camera*/
+
+.camera-container {
+  width: 100%;
+  height: 430px;
+
+  border-radius: 30px;
+
+  overflow: hidden;
+
+  background: #050509;
+
+  border: 1px solid rgba(255, 255, 255, 0.12);
+
+  position: relative;
+
+  box-shadow:
+    0 20px 80px rgba(0, 0, 0, 0.5);
+}
+
+
+.camera-feed {
+  width: 100%;
+  height: 100%;
+
+  object-fit: cover;
+
+  transform: scaleX(-1); /*flips the camera*/
+
+  display: block;
+}
+
+.camera-placeholder {
+  text-align: center;
+  opacity: 0.7;
+}
+
+.camera-icon {
+  font-size: 45px;
+  margin-bottom: 15px;
+}
+
+.camera-placeholder p {
+  font-size: 20px;
+  margin: 5px;
+}
+
+.camera-placeholder span {
+  font-size: 13px;
+  opacity: 0.6;
+}
+
+
+/*Modules */
+
+.modules {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, 1fr);
+
+  gap: 18px;
+
+  margin-top: 25px;
+}
+
+.module-card {
+  padding: 22px;
+
+  border-radius: 20px;
+
+  background:
+    rgba(255, 255, 255, 0.05);
+
+  border:
+    1px solid rgba(255, 255, 255, 0.08);
+
+  transition:
+    transform 0.25s ease,
+    background 0.25s ease;
+}
+
+.module-card:hover {
+  transform: translateY(-5px);
+
+  background:
+    rgba(255, 255, 255, 0.1);
+}
+
+.module-icon {
+  font-size: 28px;
+}
+
+.module-card h3 {
+  margin: 12px 0 5px;
+}
+
+.module-card p {
+  margin: 0;
+
+  font-size: 13px;
+
+  opacity: 0.55;
+}
+
+
+/*Gesture status*/
+
+.gesture-status {
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 10px;
+
+  margin-top: 25px;
+
+  font-size: 13px;
+
+  opacity: 0.6;
+}
+
+.gesture-dot {
+  width: 8px;
+  height: 8px;
+
+  border-radius: 50%;
+
+  background: #7c5cff;
+
+  box-shadow:
+    0 0 15px #7c5cff;
+}
+
+.landmark-canvas {
+  position: absolute;
+
+  top: 0;
+  left: 0;
+
+  width: 100%;
+  height: 100%;
+
+  pointer-events: none;
+  transform: scaleX(-1);
+}
