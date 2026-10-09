@@ -1,29 +1,59 @@
-function distance(a, b) {
-  const dx = a.x - b.x;
-  const dy = a.y - b.y;
+function calculateAngle(a, b, c) {
+  const radians = Math.atan2(
+    c.y - b.y,
+    c.x - b.x
+  ) -
+    Math.atan2(
+      a.y - b.y,
+      a.x - b.x
+    );
 
-  return Math.sqrt(dx * dx + dy * dy);
+  let angle = Math.abs(
+    (radians * 180) / Math.PI
+  );
+
+  if (angle > 180) {
+    angle = 360 - angle;
+  }
+
+  return angle;
 }
 
-function isFingerExtended(landmarks, mcp, pip, tip) {
-  const wrist = landmarks[0];
-
-  const pipDistance = distance(
+function isFingerExtended(
+  landmarks,
+  mcp,
+  pip,
+  tip
+) {
+  const angle = calculateAngle(
+    landmarks[mcp],
     landmarks[pip],
-    wrist
+    landmarks[tip]
   );
 
-  const tipDistance = distance(
-    landmarks[tip],
-    wrist
+  return angle > 150;
+}
+
+function isPinching(landmarks) {
+  const thumbTip = landmarks[4];
+  const indexTip = landmarks[8];
+
+  const dx = thumbTip.x - indexTip.x;
+  const dy = thumbTip.y - indexTip.y;
+
+  const distance = Math.sqrt(
+    dx * dx + dy * dy
   );
 
-  return tipDistance > pipDistance;
+  return distance < 0.05;
 }
 
 export function recognizeGesture(landmarks) {
   if (!landmarks || landmarks.length !== 21) {
     return "UNKNOWN";
+  }
+  if (isPinching(landmarks)) {
+    return "PINCH";
   }
 
   const indexExtended = isFingerExtended(

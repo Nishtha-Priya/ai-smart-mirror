@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { recognizeGesture } from "./gestureRecognizer";
 import "./App.css";
 
 import {
@@ -7,72 +6,112 @@ import {
   detectHands,
 } from "./handTracker";
 
+import { recognizeGesture } from "./gestureRecognizer";
+
+const handConnections = [
+  [0, 1], [1, 2], [2, 3], [3, 4],
+  [0, 5], [5, 6], [6, 7], [7, 8],
+  [5, 9], [9, 10], [10, 11], [11, 12],
+  [9, 13], [13, 14], [14, 15], [15, 16],
+  [13, 17], [17, 18], [18, 19], [19, 20],
+  [0, 17],
+];
+ const filters = [
+  { name: "Normal", description: "Natural reflection", emoji: "◉" },
+  { name: "Grayscale", description: "Classic monochrome", emoji: "◐" },
+  { name: "Warm", description: "Golden hour glow", emoji: "☀" },
+  { name: "Cool", description: "Cool blue tones", emoji: "❄" },
+  { name: "Vintage", description: "Retro film look", emoji: "✧" },
+  { name: "Blur", description: "Soft focus", emoji: "◎" },
+];
+
 function App() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+
   const [cameraError, setCameraError] = useState("");
   const [handDetected, setHandDetected] = useState(false);
   const [handTrackerReady, setHandTrackerReady] = useState(false);
   const [gesture, setGesture] = useState("NONE");
+  const [currentScreen, setCurrentScreen] = useState("HOME");
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [selectedFilter, setSelectedFilter] = useState(0);
 
-  // Start camera
   useEffect(() => {
     let stream;
+    let cancelled = false;
 
-    const startCamera = async () => {
+    async function startCamera() {
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           video: {
-            width: { ideal: 2000 },
-            height: { ideal: 5000 },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
             facingMode: "user",
           },
           audio: false,
         });
 
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
+          await videoRef.current.play();
         }
       } catch (error) {
         console.error("Camera error:", error);
-        setCameraError("Unable to access camera.");
+        if (!cancelled) {
+          setCameraError("Camera unavailable. Check browser permissions.");
+        }
       }
-    };
+    }
 
     startCamera();
 
     return () => {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
-      }
+      cancelled = true;
+      stream?.getTracks().forEach((track) => track.stop());
     };
   }, []);
 
-  // Initialize MediaPipe
   useEffect(() => {
-    const setupHandTracking = async () => {
-      const success = await initializeHandTracker();
+    let cancelled = false;
 
-      if (success) {
-        setHandTrackerReady(true);
-        console.log("Hand tracking ready!");
-      } else {
-        console.error(
-          "Failed to initialize hand tracking."
-        );
+    async function setupHandTracking() {
+      try {
+        const success = await initializeHandTracker();
+
+        if (!cancelled && success) {
+          setHandTrackerReady(true);
+        }
+      } catch (error) {
+        console.error("Hand tracking setup failed:", error);
       }
-    };
-
-    setupHandTracking();
-  }, []);
-
-  // Detect hands
-  useEffect(() => {
-    if (!handTrackerReady) {
-      return;
     }
 
+    setupHandTracking();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!handTrackerReady) return;
+
     let animationFrameId;
+    let lastVideoTime = -1;
 
     const detect = () => {
       const video = videoRef.current;
@@ -81,214 +120,241 @@ function App() {
       if (
         video &&
         canvas &&
-        video.readyState >= 2
+        video.readyState >= 2 &&
+        video.videoWidth > 0
       ) {
-        const results = detectHands(video);
+        if (
+          canvas.width !== video.videoWidth ||
+          canvas.height !== video.videoHeight
+        ) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+        }
 
         const ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+        if (video.currentTime !== lastVideoTime) {
+          lastVideoTime = video.currentTime;
 
-        ctx.clearRect(
-          0,
-          0,
-          canvas.width,
-          canvas.height
-        );
+          try {
+            const results = detectHands(video);
+            const hands = results?.landmarks ?? [];
 
-        if (
-          results &&
-          results.landmarks.length > 0
-        ) {
-          setHandDetected(true);
-          const detectedGesture =
-            recognizeGesture(results.landmarks[0]);
+            setHandDetected(hands.length > 0);
 
-          setGesture(detectedGesture);
+            if (hands.length > 0) {
+              setGesture(recognizeGesture(hands[0]));
+            } else {
+              setGesture("NONE");
+            }
 
-          const connections = [
-            [0, 1],
-            [1, 2],
-            [2, 3],
-            [3, 4],
-
-            [0, 5],
-            [5, 6],
-            [6, 7],
-            [7, 8],
-
-            [5, 9],
-            [9, 10],
-            [10, 11],
-            [11, 12],
-
-            [9, 13],
-            [13, 14],
-            [14, 15],
-            [15, 16],
-
-            [13, 17],
-            [17, 18],
-            [18, 19],
-            [19, 20],
-
-            [0, 17],
-          ];
-
-          results.landmarks.forEach((hand) => {
-            // Draw connections
-            connections.forEach(([start, end]) => {
-              const startPoint = hand[start];
-              const endPoint = hand[end];
-
-              ctx.beginPath();
-
-              ctx.moveTo(
-                startPoint.x * canvas.width,
-                startPoint.y * canvas.height
-              );
-
-              ctx.lineTo(
-                endPoint.x * canvas.width,
-                endPoint.y * canvas.height
-              );
-
-              ctx.strokeStyle = "#00ffcc";
+            hands.forEach((hand) => {
+              ctx.strokeStyle = "#72ffe0";
               ctx.lineWidth = 3;
+              ctx.lineCap = "round";
 
-              ctx.stroke();
+              handConnections.forEach(([start, end]) => {
+                ctx.beginPath();
+                ctx.moveTo(
+                  hand[start].x * canvas.width,
+                  hand[start].y * canvas.height
+                );
+                ctx.lineTo(
+                  hand[end].x * canvas.width,
+                  hand[end].y * canvas.height
+                );
+                ctx.stroke();
+              });
+
+              hand.forEach((point) => {
+                ctx.beginPath();
+                ctx.arc(
+                  point.x * canvas.width,
+                  point.y * canvas.height,
+                  4,
+                  0,
+                  Math.PI * 2
+                );
+                ctx.fillStyle = "#ffffff";
+                ctx.fill();
+              });
             });
-
-            //Draw landmarks
-            hand.forEach((landmark) => {
-              const x = landmark.x * canvas.width;
-              const y = landmark.y * canvas.height;
-
-              ctx.beginPath();
-
-              ctx.arc(x, y, 5, 0, 2 * Math.PI);
-
-              ctx.fillStyle = "#ffffff";
-
-              ctx.fill();
-            });
-          });
-        } else {
-          setHandDetected(false);
-          setGesture("NONE");
+          } catch (error) {
+            console.error("Hand detection error:", error);
+          }
         }
       }
 
-      animationFrameId =
-        requestAnimationFrame(detect);
+      animationFrameId = requestAnimationFrame(detect);
     };
 
     detect();
 
-    return () => {
-      cancelAnimationFrame(
-        animationFrameId
-      );
-    };
+    return () => cancelAnimationFrame(animationFrameId);
   }, [handTrackerReady]);
 
-  return (
-    <div className="mirror">
-      <header className="top-bar">
-        <div className="logo">
-          ✦ AI MIRROR
-        </div>
+  const formattedTime = currentTime.toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 
-        <div className="time">
-          10:42
+  const formattedDate = currentTime.toLocaleDateString("en-IN", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+
+  return (
+    <main className="mirror">
+      <video
+        ref={videoRef}
+        className="camera-feed"
+        autoPlay
+        playsInline
+        muted
+      />
+
+      <canvas
+        ref={canvasRef}
+        className="landmark-canvas"
+      />
+
+      <div className="mirror-shade" />
+
+      <header className="mirror-header">
+        <div className="mirror-brand">✦ AI MIRROR</div>
+        <div className="connection-status">
+          <span className={handTrackerReady ? "status-light ready" : "status-light"} />
+          {handTrackerReady ? "AI READY" : "INITIALIZING"}
         </div>
       </header>
 
-      <main className="mirror-content">
-        <section className="greeting">
-          <p className="small-text">
-            GOOD EVENING
-          </p>
+      {cameraError ? (
+        <div className="camera-error">{cameraError}</div>
+      ) : (
+        <section className="mirror-widgets">
+          <div className="welcome-widget">
+            <p className="eyebrow">YOUR PERSONAL SPACE</p>
+            <h1>Good {currentTime.getHours() < 12 ? "morning" : currentTime.getHours() < 17 ? "afternoon" : "evening"}.</h1>
+            <p className="date-label">{formattedDate}</p>
+            <div className="clock">{formattedTime}</div>
+          </div>
 
-          <h1>
-            Welcome to your mirror ✨
-          </h1>
-        </section>
-
-        <section className="camera-container">
-          {cameraError ? (
-            <div className="camera-placeholder">
-              <div className="camera-icon">
-                ⚠️
-              </div>
-
-              <p>{cameraError}</p>
-
-              <span>
-                Please allow camera access.
-              </span>
+          <div className="weather-widget glass-widget">
+            <span className="widget-icon">☀</span>
+            <div>
+              <p className="eyebrow">WEATHER</p>
+              <h2>--°</h2>
+              <p>Forecast coming soon</p>
             </div>
-          ) : (
-            <>
-              <video
-                ref={videoRef}
-                className="camera-feed"
-                autoPlay
-                playsInline
-                muted
-              />
-              <canvas
-                ref={canvasRef}
-                className="landmark-canvas"
-              />
-            </>
+          </div>
+
+          <div className="quick-widgets">
+            <button
+              className="glass-widget quick-card"
+              onClick={() => setCurrentScreen("FILTERS")}
+            >
+              <span>✧</span>
+              <strong>Filters</strong>
+              <small>Explore effects</small>
+            </button>
+
+            <button className="glass-widget quick-card" onClick={() => setCurrentScreen("WEATHER")}>
+              <span>☼</span>
+              <strong>Weather</strong>
+              <small>Local forecast</small>
+            </button>
+
+            <button className="glass-widget quick-card" onClick={() => setCurrentScreen("FITNESS")}>
+              <span>⌁</span>
+              <strong>Fitness</strong>
+              <small>Movement tracking</small>
+            </button>
+
+            <button className="glass-widget quick-card" onClick={() => setCurrentScreen("MUSIC")}>
+              <span>♫</span>
+              <strong>Music</strong>
+              <small>Listening space</small>
+            </button>
+          </div>
+          {currentScreen !== "HOME" && (
+            <section className="selection-panel glass-widget">
+              <button
+                className="panel-close"
+                onClick={() => setCurrentScreen("HOME")}
+                aria-label="Return home"
+              >
+                ×
+              </button>
+
+              {currentScreen === "FILTERS" ? (
+                <>
+                  <p className="eyebrow">PERSONALIZE YOUR REFLECTION</p>
+                  <h2>Choose your filter</h2>
+                  <p className="filter-instruction">
+                    Select a look for your mirror
+                  </p>
+
+                  <div className="filter-list">
+                    {filters.map((filter, index) => (
+                      <button
+                        key={filter.name}
+                        className={`filter-option ${
+                          selectedFilter === index ? "selected" : ""
+                        }`}
+                        onClick={() => setSelectedFilter(index)}
+                      >
+                        <span className="filter-emoji">
+                          {filter.emoji}
+                        </span>
+
+                        <span className="filter-details">
+                          <strong>{filter.name}</strong>
+                          <small>{filter.description}</small>
+                        </span>
+
+                        {selectedFilter === index && (
+                          <span className="filter-check">✓</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+
+                  <p className="filter-hint">
+                    ✋ Gesture control coming next
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="eyebrow">SMART MIRROR</p>
+                  <h2>
+                    {currentScreen === "WEATHER"
+                      ? "Your weather"
+                      : currentScreen === "FITNESS"
+                        ? "Fitness studio"
+                        : "Music controls"}
+                  </h2>
+                  <p>This module will be built in a future step.</p>
+                </>
+              )}
+            </section>
           )}
         </section>
+      )}
 
-        <section className="modules">
-          <div className="module-card">
-            <span className="module-icon">🎨</span>
-            <h3>Filters</h3>
-            <p>Explore visual effects</p>
-          </div>
+      <footer className="mirror-footer">
+        <div className="gesture-indicator">
+          <span className={handDetected ? "gesture-light active" : "gesture-light"} />
+          <span>{handDetected ? `GESTURE · ${gesture.replace("_", " ")}` : "SHOW YOUR HAND TO BEGIN"}</span>
+        </div>
 
-          <div className="module-card">
-            <span className="module-icon">🌤️</span>
-            <h3>Weather</h3>
-            <p>Today's forecast</p>
-          </div>
-
-          <div className="module-card">
-            <span className="module-icon">💪</span>
-            <h3>Fitness</h3>
-            <p>Track your workout</p>
-          </div>
-
-          <div className="module-card">
-            <span className="module-icon">🎵</span>
-            <h3>Music</h3>
-            <p>Control your music</p>
-          </div>
-        </section>
-      </main>
-
-      <footer className="gesture-status">
-        <div
-          className={
-            handDetected
-              ? "gesture-dot active"
-              : "gesture-dot"
-          }
-        />
-
-        <span>
-          {handDetected
-            ? `Gesture: ${gesture}`
-            : "Waiting for hand..."}
-        </span>
+        <div className="footer-hint">
+          TOUCHLESS INTERACTION
+        </div>
       </footer>
-    </div>
+    </main>
   );
 }
 

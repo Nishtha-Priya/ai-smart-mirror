@@ -1,10 +1,26 @@
+* {
+  box-sizing: border-box;
+}
+
 html,
 body,
 #root {
   width: 100%;
   min-height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  min-width: 320px;
 }
 
 body {
   overflow-x: hidden;
+  background: #090b10;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
 }
